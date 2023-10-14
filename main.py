@@ -21,7 +21,7 @@ from keywords_prompt import keyword_prompt
 store = LocalFileStore("./cache")
 
 dir_loader = DirectoryLoader(
-    "/kaggle/input/cbse-old-times",
+    "./assets",
     glob="*.pdf",
     loader_cls=PyPDFLoader
 )
