@@ -107,10 +107,17 @@ custom_prompt = PromptTemplate(template=PROMPT_TEMPLATE,
                             input_variables=input_variables)
 
 
+from pydantic import BaseModel
+
+class APIBody(BaseModel):
+    n: int = 5
+    topics: list = []
 app = FastAPI()
 
 @app.get("/")
-def ask(n: int = 5, topics: list = []):
+def ask(apiBody: APIBody):
+    n = apiBody.n
+    topics = apiBody.topics
     handler = StdOutCallbackHandler()
     bm25_retriever = BM25Retriever.from_documents(esops_documents)
     bm25_retriever.k=5
