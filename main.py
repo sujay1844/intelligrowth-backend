@@ -1,4 +1,6 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from keybert.llm import TextGeneration
+from keybert import KeyLLM
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.llms import HuggingFacePipeline
 from langchain.callbacks import StdOutCallbackHandler
@@ -16,6 +18,7 @@ from langchain.document_loaders import TextLoader
 from langchain.embeddings import HuggingFaceEmbeddings
 
 from fastapi import FastAPI
+from pydantic import BaseModel
 
 data_root = "./data"
 loaders=[
@@ -106,15 +109,95 @@ input_variables = ['context', 'question']
 custom_prompt = PromptTemplate(template=PROMPT_TEMPLATE,
                             input_variables=input_variables)
 
+keyword_generator = pipeline(
+    model=model,
+    tokenizer=tokenizer,
+    task='text-generation',
+    max_new_tokens=8,
+    repetition_penalty=1.1
+)
 
-from pydantic import BaseModel
+feedback_generator = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    max_new_tokens=256,
+    do_sample=True,
+    temperature=0.5,
+    top_p=0.95,
+    top_k=40,
+    repetition_penalty=1.1
+)
+
+keyword_example_prompt = """
+<s>[INST]
+I have the following document:
+- The website mentions that it only takes a couple of days to deliver but I still have not received mine.
+
+Please give me the keywords that are present in this document and separate them with commas.
+Make sure you to only return the keywords and say nothing else. For example, don't say:
+"Here are the keywords present in the document"
+[/INST] meat, beef, eat, eating, emissions, steak, food, health, processed, chicken</s>"""
+
+keyword_ins_prompt = """
+[INST]
+I have the following document:
+- [DOCUMENT]
+
+Please give me the keywords that are present in this document and separate them with commas.
+Make sure you to only return the keywords and say nothing else. For example, don't say:
+"Here are the keywords present in the document"
+[/INST]
+"""
+
+keyword_prompt = keyword_example_prompt + keyword_ins_prompt
+
+key_llm = TextGeneration(keyword_generator, prompt=keyword_prompt)
+kw_model = KeyLLM(key_llm)
+
+def get_missing_keywords(response, expected):
+    response_keywords = kw_model.extract_keywords(response)[0]
+    expected_keywords = kw_model.extract_keywords(expected)[0]
+
+    return list(set(expected_keywords) - set(response_keywords))
+
+def get_feedback(question, response, expected):
+
+    prompt = f'''
+[INST]
+<<SYS>>
+You are a teacher and you are grading a student's response to a question.
+Here is an example of what you should do:
+Question: "What is the capital of France?"
+Response: "Lyon"
+Expected: "Paris"
+Feedback: "The student has confused Lyon and Paris. Lyon is the second largest city in France, but Paris is the capital."
+<</SYS>>
+Now, you are grading the following response:
+Question: "{question}"
+Response: "{response}"
+Expected: "{expected}"
+
+Give feedback to the student on their response. Make sure to be specific and constructive. Just give feedback on the response, not the question or anything else.
+Wrap your feedback in [FEEDBACK] and [/FEEDBACK] tags.
+[/INST]
+'''
+
+    return feedback_generator(prompt)[0]['generated_text']
+
 
 class APIBody(BaseModel):
     n: int = 5
     topics: list = []
+
+class APIBody2(BaseModel):
+    question: str
+    response: str
+    expected: str
+
 app = FastAPI()
 
-@app.get("/")
+@app.get("/qa")
 def ask(apiBody: APIBody):
     n = apiBody.n
     topics = apiBody.topics
@@ -133,14 +216,25 @@ def ask(apiBody: APIBody):
         return_source_documents=True
     )
     topics_list = [topic.replace(".txt", "").replace(f"{data_root}/", "") for topic in topics]
-    q_query = f"Give me only {n} questions about {topics_list} which will help me to deepen my understanding and give no answers"
+    q_query = f"Give me only {n} questions about {topics_list} which will help me to deepen my understanding and give no answers and dont add anything extra such as \"Of course! I'd be happy to help you with that. Here are five questions\""
     result = qa_with_sources_chain({'query':q_query})
 
     a_query = f"Give me only the answers for each of the questions in {result['result']} and dont add anything extra such as \"Of course! I'd be happy to help you with that. Here are five questions\" "
     answers = qa_with_sources_chain({"query":a_query})
     return {
-        "questions": result['result'],
-        "answers": answers['result'],
+        "questions": result['result'].split("\n"),
+        "answers": answers['result'].split("\n"),
     }
 
+@app.get("/feedback")
+def generate_keywords(apiBody: APIBody2):
+
+    question = apiBody.question
+    response = apiBody.response
+    expected = apiBody.expected
+
+    return {
+        "missing_keywords": get_missing_keywords(response,expected),
+        "feedback": get_feedback(question, response, expected),
+    }
 
