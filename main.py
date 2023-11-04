@@ -1,86 +1,91 @@
-import langchain
-from langchain.embeddings import CacheBackedEmbeddings,HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.storage import LocalFileStore
-from langchain.retrievers import BM25Retriever,EnsembleRetriever
-from langchain.document_loaders import PyPDFLoader,DirectoryLoader
-from langchain.llms import HuggingFacePipeline
-from langchain.cache import InMemoryCache
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import prompt
-from langchain.chains import RetrievalQA
-from langchain.callbacks import StdOutCallbackHandler
-from langchain import PromptTemplate
-from langchain.globals import set_llm_cache
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-from keybert.llm import TextGeneration
-from keybert import KeyLLM, KeyBERT
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.llms import HuggingFacePipeline
+from langchain.callbacks import StdOutCallbackHandler
+from langchain.retrievers import BM25Retriever,EnsembleRetriever
+from langchain.callbacks import StdOutCallbackHandler
+from langchain.prompts import PromptTemplate
+from langchain.retrievers import BM25Retriever,EnsembleRetriever
+from langchain.chains import RetrievalQA
+from langchain.embeddings import HuggingFaceEmbeddings
 
-from keywords_prompt import keyword_prompt
+from langchain.prompts import PromptTemplate
+from langchain.vectorstores import Chroma
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders import TextLoader
+from langchain.embeddings import HuggingFaceEmbeddings
 
-store = LocalFileStore("./cache")
+from fastapi import FastAPI
 
-dir_loader = DirectoryLoader(
-    "./assets",
-    glob="*.pdf",
-    loader_cls=PyPDFLoader
+data_root = "./data"
+loaders=[
+	TextLoader(f"{data_root}/RoleandPowerofGovernor.txt"),
+	TextLoader(f"{data_root}/Governor’sRoleinUniversities.txt"),
+	TextLoader(f"{data_root}/Governor’sPowertodecideonBills-VetoPower.txt"),
+	TextLoader(f"{data_root}/ChiefMinister.txt"),
+	TextLoader(f"{data_root}/'Union'or'Central'Government.txt"),
+	TextLoader(f"{data_root}/InterimReportofJ&KDelimitationCommission.txt"),
+	TextLoader(f"{data_root}/Assam-MeghalayaBorderDispute .txt"),
+	TextLoader(f"{data_root}/KrishnaWaterDispute.txt"),
+	TextLoader(f"{data_root}/StatehoodDemandbyPuducherry.txt"),
+	TextLoader(f"{data_root}/BelagaviBorderDispute.txt"),
+	TextLoader(f"{data_root}/DemandforIncludingLadakhunderSixthSchedule.txt"),
+	TextLoader(f"{data_root}/SpecialCategoryStatus.txt"),
+	TextLoader(f"{data_root}/E-ILPPlatform-Manipur.txt"),
+	TextLoader(f"{data_root}/LegislativeCouncil.txt"),
+	TextLoader(f"{data_root}/GovernmentofNCTofDelhi(Amendment)Act,2021.txt"),
+	TextLoader(f"{data_root}/NationalPanchayatiRajDay.txt"),
+]
+docs=[]
+for loader in loaders:
+  docs.extend(loader.load())
+
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500,
+                                      chunk_overlap=200,)
+#
+esops_documents = text_splitter.transform_documents(docs)
+
+model_name = "BAAI/bge-small-en-v1.5"
+model_kwargs = {"device": "cuda"}
+encode_kwargs = {"normalize_embeddings":True}
+
+embeddings= HuggingFaceEmbeddings(model_name=model_name,
+                                  model_kwargs=model_kwargs,
+                                  encode_kwargs=encode_kwargs,
+                                  )
+
+persist_docs="chroma"
+vector_db=Chroma.from_documents(
+    documents=esops_documents,
+    embedding=embeddings,
+    persist_directory=persist_docs
 )
-docs = dir_loader.load()
 
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,
-    chunk_overlap=200
-)
+model_name_or_path = "TheBloke/Llama-2-7b-Chat-GPTQ"
+# To use a different branch, change revision
+# For example: revision="gptq-4bit-64g-actorder_True"
+model = AutoModelForCausalLM.from_pretrained(model_name_or_path,
+                                             device_map="auto",
+                                             trust_remote_code=False,
+                                             revision="main")
 
-split_documents = text_splitter.transform_documents(docs)
-
-store = LocalFileStore("./cache/")
-embed_model_id = 'BAAI/bge-small-en-v1.5'
-core_embeddings_model = HuggingFaceEmbeddings(model_name=embed_model_id)
-embedder = CacheBackedEmbeddings.from_bytes_store(
-    core_embeddings_model,
-    store,
-    namespace=embed_model_id
-)
-# Create VectorStore
-vectorstore = FAISS.from_documents(split_documents,embedder)
-
-PROMPT_TEMPLATE="""Act as a strict professor who has immense knowledge about the given document.
-Generate a list of questions that cover the following categories : 
-Factual Questions : Answered with specific facts from the document. 
-Conceptual Questions : require the reader to understand the main concepts in the document. 
-Critical thinking Questions : require the reader to analyze and evaluate the information in the document. 
-Creative questions : ask the reader to come up with new ideas or perspectives based on the information in the document.
-Every question must align with the main points of the document. 
-Please strictly generate 5 questions along with detailed answers based on the following document about [Insert Document Topic]. Ensure that the questions are relevant and the answers are accurate, using information from the document.
-Context: {context}
-Question: {question}
-Do provide only helpful answers
-
-Helpful answer:
-"""
-
-input_variables=['context','question']
-
-custom_prompt=PromptTemplate(template=PROMPT_TEMPLATE,input_variables=input_variables)
-
-bm25_retriever = BM25Retriever.from_documents(split_documents)
-bm25_retriever.k=5
-
-model_name_or_path = "TheBloke/Mistral-7B-Instruct-v0.1-GPTQ"
-model = AutoModelForCausalLM.from_pretrained(
-    model_name_or_path,
-    device_map="auto",
-    trust_remote_code=False,
-    revision="gptq-8bit-32g-actorder_True"
-)
 tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=True)
 
-pipe = pipeline(
+
+model_name = "BAAI/bge-large-en-v1.5"
+model_kwargs = {"device": "cuda"}
+encode_kwargs = {"normalize_embeddings":True}
+
+embeddings= HuggingFaceEmbeddings(model_name=model_name,
+                                  model_kwargs=model_kwargs,
+                                  encode_kwargs=encode_kwargs,
+                                  )
+
+qa_pipeline = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
-    max_new_tokens=4096,
+    max_new_tokens=2048,
     do_sample=True,
     temperature=0.1,
     top_p=0.95,
@@ -88,66 +93,59 @@ pipe = pipeline(
     repetition_penalty=1.1
 )
 
-llm = HuggingFacePipeline(pipeline=pipe)
-faiss_retriever = vectorstore.as_retriever(search_kwargs={"k":5})
-bm25_retriever = BM25Retriever.from_documents(split_documents)
-bm25_retriever.k=5
-
-ensemble_retriever = EnsembleRetriever(
-    retrievers=[bm25_retriever,faiss_retriever],
-    weights=[0.5,0.5]
-)
+llm = HuggingFacePipeline(pipeline=qa_pipeline)
 
 
-set_llm_cache(InMemoryCache())
+PROMPT_TEMPLATE = '''
+[INST]<<SYS>>
+You are my learning assistant.You are very good at creating questions that end with the symbol '?'.
+With the information being provided answer the question compulsorly.
+If you cant generate a  question based on the information either say you cant  generate .
+So try to understand in depth about the context and generate questions only based on the information provided. Dont generate irrelevant questions
+<</SYS>>
+Context: {context}
+Question: {question}
+Do provide only helpful answers
 
-handler = StdOutCallbackHandler()
-
-qa_with_sources_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever = ensemble_retriever,
-    callbacks=[handler],
-    chain_type_kwargs={"prompt": custom_prompt},
-    return_source_documents=True
-)
-
-keyword_pipe = pipeline(
-    "text-generation",
-    model=model,
-    tokenizer=tokenizer,
-    max_new_tokens=50,
-    repetition_penalty=1.1
-)
-llm = TextGeneration(keyword_pipe, prompt=keyword_prompt)
-kw_model = KeyBERT(llm=llm, model='BAAI/bge-small-en-v1.5')
-
-from flask import Flask, jsonify, request
-import requests_cache
-requests_cache.install_cache('api_cache', backend='sqlite', expire_after=180)
+Helpful answer:
 
 
-app = Flask(__name__)
+[/INST]
+'''
 
-@app.route('/query')
-def query():
-    data = request.get_json()
-    chapter = data.get('chapter')
-    query = f"Give me questions on the chapter number {chapter}"
-    response = qa_with_sources_chain({"query":query})
-    return jsonify({
-        "response": response,
-    })
+input_variables = ['context', 'question']
 
-@app.route('/keywords')
-def get_keywords():
-    data = request.get_json()
-    doc = data.get('doc')
-    keywords = kw_model.extract_keywords([doc], threshold=.5)
-    return jsonify({
-        "keywords": keywords,
-    })
+custom_prompt = PromptTemplate(template=PROMPT_TEMPLATE,
+                            input_variables=input_variables)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+
+app = FastAPI()
+
+@app.get("/")
+def ask(n: int = 5, topics: list = []):
+    handler = StdOutCallbackHandler()
+    bm25_retriever = BM25Retriever.from_documents(esops_documents)
+    bm25_retriever.k=5
+    chroma_retriever=vector_db.as_retriever(search_kwargs={"k":5},filter={"source":topics})
+    ensemble_retriever = EnsembleRetriever(retrievers=[bm25_retriever,chroma_retriever],weights=[0.5,0.5])
+    qa_with_sources_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=ensemble_retriever,
+        verbose=True,
+        callbacks=[handler],
+        chain_type_kwargs={"prompt": custom_prompt},
+        return_source_documents=True
+    )
+    topics_list = [topic.replace(".txt", "").replace(f"{data_root}/", "") for topic in topics]
+    q_query = f"Give me only {n} questions about {topics_list} which will help me to deepen my understanding and give no answers"
+    result = qa_with_sources_chain({'query':q_query})
+
+    a_query = f"Give me only the answers for each of the questions in {result['result']} and dont add anything extra such as \"Of course! I'd be happy to help you with that. Here are five questions\" "
+    answers = qa_with_sources_chain({"query":a_query})
+    return {
+        "questions": result['result'],
+        "answers": answers['result'],
+    }
+
 
