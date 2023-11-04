@@ -65,21 +65,9 @@ model_name_or_path = "TheBloke/Llama-2-7b-Chat-GPTQ"
 # To use a different branch, change revision
 # For example: revision="gptq-4bit-64g-actorder_True"
 model = AutoModelForCausalLM.from_pretrained(model_name_or_path,
-                                             device_map="auto",
-                                             trust_remote_code=False,
-                                             revision="main")
+                                             device_map="auto")
 
 tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=True)
-
-
-model_name = "BAAI/bge-large-en-v1.5"
-model_kwargs = {"device": "cuda"}
-encode_kwargs = {"normalize_embeddings":True}
-
-embeddings= HuggingFaceEmbeddings(model_name=model_name,
-                                  model_kwargs=model_kwargs,
-                                  encode_kwargs=encode_kwargs,
-                                  )
 
 qa_pipeline = pipeline(
     "text-generation",
