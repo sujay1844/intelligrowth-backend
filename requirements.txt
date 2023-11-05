@@ -1,0 +1,15 @@
+transformers>=4.32.0
+optimum
+auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu123/
+langchain
+tiktoken
+sentence-transformers
+trl
+Py7zr
+rank_bm25
+PyPdf
+cohere
+openai
+chromadb
+python-multipart
+keybert

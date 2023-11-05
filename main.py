@@ -238,3 +238,7 @@ def generate_keywords(apiBody: APIBody2):
         "feedback": get_feedback(question, response, expected),
     }
 
+
+@app.get("/ping")
+def ping():
+    return "pong"
