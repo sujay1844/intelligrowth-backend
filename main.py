@@ -264,7 +264,8 @@ def generate_keywords(apiBody: APIBody2):
     qna = question + "\n" + expected
 
     reference = vector_db.similarity_search(qna, k=1)
-    reference_content = dict(reference[0])['content']
+    reference_content = reference[0]
+    print(reference_content)
 
     feedback = get_feedback(question, response, expected)
     feedback = re.sub(r'[INST].*[/INST]', '', feedback)
@@ -272,7 +273,7 @@ def generate_keywords(apiBody: APIBody2):
     return {
         "missing_keywords": get_missing_keywords(response,expected),
         "feedback": feedback,
-        "references": reference_content,
+        "references": "Hello",
     }
 
 @app.get("/clear")
