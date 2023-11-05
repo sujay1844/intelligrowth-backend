@@ -21,6 +21,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import re
+
 data_root = "./data"
 loaders=[
 	TextLoader(f"{data_root}/RoleandPowerofGovernor.txt"),
@@ -180,7 +182,6 @@ Response: "{response}"
 Expected: "{expected}"
 
 Give feedback to the student on their response. Make sure to be specific and constructive. Just give feedback on the response, not the question or anything else.
-Wrap your feedback in [FEEDBACK] and [/FEEDBACK] tags.
 [/INST]
 '''
 
@@ -263,9 +264,12 @@ def generate_keywords(apiBody: APIBody2):
 
     references = vector_db.similarity_search(qna, k=5)
 
+    feedback = get_feedback(question, response, expected)
+    feedback = re.sub(r'[INST].*[/INST]', '', feedback)
+
     return {
         "missing_keywords": get_missing_keywords(response,expected),
-        "feedback": get_feedback(question, response, expected),
+        "feedback": feedback,
         "references": references,
     }
 
