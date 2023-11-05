@@ -228,10 +228,10 @@ def ask(apiBody: APIBody):
         return_source_documents=True
     )
     topics_list = [topic.replace(".txt", "").replace(f"{data_root}/", "") for topic in topics]
-    q_query = f"Give me only {n} questions about {topics_list} which will help me to deepen my understanding and give no answers and dont add anything extra such as \"Of course! I'd be happy to help you with that. Here are five questions\""
+    q_query = f"Give me only {n} questions about {topics_list} which will help me to deepen my understanding and give no answers and dont add anything extra such as \"Of course! I'd be happy to help you with that. Here are five questions\". Give me each question in a single new line."
     result = qa_with_sources_chain({'query':q_query})
 
-    a_query = f"Give me only the answers for each of the questions in {result['result']} and dont add anything extra such as \"Of course! I'd be happy to help you with that. Here are five questions\" "
+    a_query = f"Give me only the answers for each of the questions in {result['result']} and dont add anything extra such as \"Of course! I'd be happy to help you with that. Here are five questions\". Give me each answer in a single new line."
     answers1 = qa_with_sources_chain({"query":a_query})
 
     global questions
@@ -267,6 +267,13 @@ def generate_keywords(apiBody: APIBody2):
         "references": references,
     }
 
+@app.get("/clear")
+def clear():
+    global questions
+    global answers
+    questions = []
+    answers = []
+    return "Cleared"
 
 @app.get("/ping")
 def ping():
