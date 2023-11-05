@@ -259,7 +259,9 @@ def generate_keywords(apiBody: APIBody2):
     response = apiBody.response
     expected = apiBody.expected
 
-    references = []
+    qna = question + "\n" + expected
+
+    references = vector_db.similarity_search(qna, k=5)
 
     return {
         "missing_keywords": get_missing_keywords(response,expected),
