@@ -206,6 +206,9 @@ app.add_middleware(
     expose_headers=["*"],  # Replace "*" with the list of headers to expose to the client
 )
 
+questions = []
+answers = []
+
 @app.post("/qa")
 def ask(apiBody: APIBody):
     n = apiBody.n
@@ -229,10 +232,24 @@ def ask(apiBody: APIBody):
     result = qa_with_sources_chain({'query':q_query})
 
     a_query = f"Give me only the answers for each of the questions in {result['result']} and dont add anything extra such as \"Of course! I'd be happy to help you with that. Here are five questions\" "
-    answers = qa_with_sources_chain({"query":a_query})
+    answers1 = qa_with_sources_chain({"query":a_query})
+
+    global questions
+    global answers
+    questions = result['result'].split("\n")
+    answers = answers1['result'].split("\n")
     return {
         "questions": result['result'].split("\n"),
-        "answers": answers['result'].split("\n"),
+        "answers": answers1['result'].split("\n"),
+    }
+
+@app.post("/q")
+def get_question(n: int):
+    global questions
+    global answers
+    return {
+        "question": questions[n],
+        "answer": answers[n],
     }
 
 @app.post("/feedback")
@@ -242,9 +259,12 @@ def generate_keywords(apiBody: APIBody2):
     response = apiBody.response
     expected = apiBody.expected
 
+    references = []
+
     return {
         "missing_keywords": get_missing_keywords(response,expected),
         "feedback": get_feedback(question, response, expected),
+        "references": references,
     }
 
 
