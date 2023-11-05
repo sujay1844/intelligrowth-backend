@@ -18,6 +18,7 @@ from langchain.document_loaders import TextLoader
 from langchain.embeddings import HuggingFaceEmbeddings
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 data_root = "./data"
@@ -196,6 +197,14 @@ class APIBody2(BaseModel):
     expected: str
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with the list of allowed origins
+    allow_methods=["*"],  # Replace "*" with the list of allowed HTTP methods (e.g., ["GET", "POST"])
+    allow_headers=["*"],  # Replace "*" with the list of allowed headers
+    allow_credentials=True,  # Set to True to allow sending cookies and authentication headers
+    expose_headers=["*"],  # Replace "*" with the list of headers to expose to the client
+)
 
 @app.get("/qa")
 def ask(apiBody: APIBody):
