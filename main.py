@@ -114,7 +114,7 @@ keyword_generator = pipeline(
     model=model,
     tokenizer=tokenizer,
     task='text-generation',
-    max_new_tokens=8,
+    max_new_tokens=50,
     repetition_penalty=1.1
 )
 
