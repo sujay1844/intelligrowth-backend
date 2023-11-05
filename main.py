@@ -206,7 +206,7 @@ app.add_middleware(
     expose_headers=["*"],  # Replace "*" with the list of headers to expose to the client
 )
 
-@app.get("/qa")
+@app.post("/qa")
 def ask(apiBody: APIBody):
     n = apiBody.n
     topics = apiBody.topics
@@ -235,7 +235,7 @@ def ask(apiBody: APIBody):
         "answers": answers['result'].split("\n"),
     }
 
-@app.get("/feedback")
+@app.post("/feedback")
 def generate_keywords(apiBody: APIBody2):
 
     question = apiBody.question
