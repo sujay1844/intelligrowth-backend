@@ -13,3 +13,4 @@ openai
 chromadb
 python-multipart
 keybert
+unstructured
