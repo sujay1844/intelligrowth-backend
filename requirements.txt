@@ -1,6 +1,6 @@
 transformers>=4.32.0
 optimum
-auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu123/
+auto-gptq
 langchain
 tiktoken
 sentence-transformers
