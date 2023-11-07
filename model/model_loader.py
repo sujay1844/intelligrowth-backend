@@ -8,7 +8,6 @@ embeddings= HuggingFaceEmbeddings(
     model_name=embedding_model_name,
     model_kwargs={"device": "cuda"},
     encode_kwargs={"normalize_embeddings":True},
-    disable_exllama=True
     )
 
 model = AutoModelForCausalLM.from_pretrained(
