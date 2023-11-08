@@ -13,7 +13,6 @@ embeddings= HuggingFaceEmbeddings(
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     device_map="auto",
-    disable_exllama=True
     )
 
-tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True, disable_exllama=True)
+tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)

@@ -1,13 +1,10 @@
-FROM nvidia/cuda:11.4.0-base-ubuntu20.04
+FROM python:3.10
 WORKDIR /app
 
-RUN apt update
-RUN apt-get install -y python3 python3-pip
+COPY ./requirements.txt .
 
-COPY ./requirements.txt ./requirements.txt
-
-RUN pip install --no-cache-dir --upgrade -r ./requirements.txt
+RUN pip install --no-cache-dir -r ./requirements.txt
 
 COPY . .
 
-CMD ["uvicorn", "--port", "80", "main:app"]
+CMD ["uvicorn", "--port", "80", "--host", "0.0.0.0", "main:app"]
