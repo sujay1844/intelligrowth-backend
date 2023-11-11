@@ -1,4 +1,5 @@
 transformers>=4.32.0
+torch
 optimum
 auto-gptq
 langchain
